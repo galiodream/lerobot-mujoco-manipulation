@@ -1,4 +1,41 @@
+# MuJoCo render analysis artifacts
 *MUJOCO_RENDER*
+
+# IDE
 .vscode
 .agents
 .codex
+.claude
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+*.so
+
+# Data and outputs (large files)
+data/
+outputs/
+
+# Conda env
+.conda/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Model checkpoints
+ckpt/
+checkpoints/
+*.ckpt
+*.pth
+*.safetensors
+
+# Demo data
+demo_data*/

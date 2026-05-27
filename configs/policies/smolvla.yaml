@@ -1,0 +1,10 @@
+# SmolVLA policy config (for Milestone 3+)
+type: smolvla
+path: lerobot/smolvla_base
+device: cuda
+chunk_size: 10
+action_chunk:
+  prediction_horizon: 10
+  execution_horizon: 5
+  overlap_strategy: queue
+  action_smoothing: 0.0

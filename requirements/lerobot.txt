@@ -1,0 +1,7 @@
+# LeRobot training and inference dependencies
+# Use: pip install -r requirements/lerobot.txt -c constraints/core.txt -c constraints/lerobot.txt
+-r base.txt
+torch
+lerobot
+transformers
+datasets

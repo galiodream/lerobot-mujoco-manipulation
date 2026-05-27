@@ -1,0 +1,3 @@
+# LingBot-VLA post-training dependencies (independent environment)
+# This is NOT required for core MuJoCo + LeRobot loop.
+# Install in a separate conda env / venv.

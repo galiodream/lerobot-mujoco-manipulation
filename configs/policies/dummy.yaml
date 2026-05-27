@@ -1,0 +1,10 @@
+# Dummy policy for smoke testing the environment
+type: dummy
+path: ""
+device: cpu
+chunk_size: 1
+action_chunk:
+  prediction_horizon: 1
+  execution_horizon: 1
+  overlap_strategy: queue
+  action_smoothing: 0.0

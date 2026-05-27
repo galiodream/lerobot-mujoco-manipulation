@@ -1,0 +1,31 @@
+# Robot profile: Open Manipulator Y (OMY) 6-DOF arm
+name: omy
+arm_dof: 6
+gripper_dof: 1
+action_dim: 7
+state_dim: 7
+
+mujoco:
+  scene_xml: assets/mujoco/robots/omy/scene.xml
+  end_effector_body: tcp_link
+  gripper_actuator: gripper
+
+control:
+  action_mode: joint_position
+  joint_names:
+    - joint1
+    - joint2
+    - joint3
+    - joint4
+    - joint5
+    - joint6
+  gripper:
+    open_value: 1.0
+    close_value: 0.0
+
+lerobot_features:
+  images:
+    front: observation.images.front
+    wrist: observation.images.wrist
+  state: observation.state
+  action: action

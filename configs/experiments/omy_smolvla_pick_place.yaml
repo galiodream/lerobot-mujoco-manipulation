@@ -1,0 +1,72 @@
+# Experiment: OMY + SmolVLA on pick-place task
+seed: 42
+
+env:
+  name: omy_pick_place
+  scene_xml: assets/mujoco/tasks/pick_place_mug.xml
+  sim_hz: 500
+  control_hz: 20
+  vector:
+    num_envs: 1
+    backend: sync
+  cameras:
+    front:
+      width: 256
+      height: 256
+    wrist:
+      width: 256
+      height: 256
+  randomization:
+    object_pose: true
+    lighting: false
+    texture: false
+  success:
+    type: pick_place
+    params:
+      object_body: body_obj_mug_5
+      target_body: body_obj_plate_11
+      distance_threshold: 0.05
+      stable_steps: 10
+
+robot:
+  profile: omy
+  action_mode: joint_position
+  action_dim: 7
+  state_dim: 7
+
+dataset:
+  repo_id: local/omy_pick_place
+  root: data/lerobot/omy_pick_place
+  fps: 20
+  task: "pick up the mug and place it on the plate"
+  curation:
+    keep_success_only: true
+    max_episode_steps: 400
+    balance_by:
+      - object_type
+      - difficulty
+
+policy:
+  type: smolvla
+  path: lerobot/smolvla_base
+  device: cuda
+  chunk_size: 10
+  action_chunk:
+    prediction_horizon: 10
+    execution_horizon: 5
+    overlap_strategy: queue
+    action_smoothing: 0.0
+
+rollout:
+  episodes: 20
+  max_steps: 400
+  save_video: true
+  output_dir: outputs/rollouts/omy_smolvla
+
+logging:
+  local:
+    jsonl: true
+    csv: true
+    videos: true
+  wandb:
+    enable: false

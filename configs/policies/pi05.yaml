@@ -1,0 +1,10 @@
+# pi0.5 policy config (for Milestone 3+)
+type: pi05
+path: lerobot/pi05
+device: cuda
+chunk_size: 50
+action_chunk:
+  prediction_horizon: 50
+  execution_horizon: 5
+  overlap_strategy: queue
+  action_smoothing: 0.0

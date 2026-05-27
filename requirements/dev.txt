@@ -1,0 +1,6 @@
+# Dev dependencies
+-r base.txt
+pytest>=7.0.0
+pytest-cov
+pre-commit
+ruff

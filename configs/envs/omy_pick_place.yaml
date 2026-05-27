@@ -1,0 +1,30 @@
+# Environment config: OMY arm + pick-place on tabletop
+name: omy_pick_place
+scene_xml: assets/mujoco/tasks/pick_place_mug.xml
+sim_hz: 500
+control_hz: 20
+
+vector:
+  num_envs: 1
+  backend: sync
+
+cameras:
+  front:
+    width: 256
+    height: 256
+  wrist:
+    width: 256
+    height: 256
+
+randomization:
+  object_pose: true
+  lighting: false
+  texture: false
+
+success:
+  type: pick_place
+  params:
+    object_body: body_obj_mug_5
+    target_body: body_obj_plate_11
+    distance_threshold: 0.05
+    stable_steps: 10

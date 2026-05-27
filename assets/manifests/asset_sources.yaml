@@ -1,0 +1,59 @@
+# Asset sources manifest
+# Each entry records origin, license, scale, and conversion notes.
+# License-unclear assets: local experiment use only, do NOT redistribute.
+
+assets:
+  - name: omy_robot
+    type: robot
+    source_url: https://github.com/galiodream/lerobot-mujuco
+    license: "check upstream repository before redistribution"
+    version: "main@latest"
+    local_path: assets/mujoco/robots/omy
+    scale: 1.0
+    orientation_fix: null
+    conversion_required: false
+    notes: "Open Manipulator Y (OMY) 6-DOF arm with parallel gripper. First baseline robot."
+
+  - name: tabletop_arena
+    type: arena
+    source_url: https://github.com/galiodream/lerobot-mujuco
+    license: "check upstream repository before redistribution"
+    version: "main@latest"
+    local_path: assets/mujoco/arenas
+    scale: 1.0
+    orientation_fix: null
+    conversion_required: false
+    notes: "Table with wood texture, floor, sky, and fixed cameras (agentview, topview, sideview)."
+
+  - name: mug_red
+    type: object
+    source_url: https://github.com/galiodream/lerobot-mujuco
+    license: "Objaverse-sourced; check upstream for redistribution terms"
+    version: "main@latest"
+    local_path: assets/mujoco/objects/mugs/mug_5
+    scale: 1.0
+    orientation_fix: "z-up via refquat"
+    conversion_required: true
+    notes: "Red mug from Objaverse, converted to MuJoCo mesh with collision geoms."
+
+  - name: mug_blue
+    type: object
+    source_url: https://github.com/galiodream/lerobot-mujuco
+    license: "Objaverse-sourced; check upstream for redistribution terms"
+    version: "main@latest"
+    local_path: assets/mujoco/objects/mugs/mug_6
+    scale: 1.0
+    orientation_fix: "z-up via refquat"
+    conversion_required: true
+    notes: "Blue mug from Objaverse, converted to MuJoCo mesh with collision geoms."
+
+  - name: plate
+    type: object
+    source_url: https://github.com/galiodream/lerobot-mujuco
+    license: "Objaverse-sourced; check upstream for redistribution terms"
+    version: "main@latest"
+    local_path: assets/mujoco/objects/plates/plate_11
+    scale: 1.0
+    orientation_fix: "z-up via refquat"
+    conversion_required: true
+    notes: "Plate from Objaverse, zipped. Extract before use."

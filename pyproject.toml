@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "robot-vla-mujoco"
+version = "0.1.0"
+description = "MuJoCo-based robot manipulation simulation for VLA policy post-training and evaluation"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+authors = [{name = "Pei"}]
+dynamic = ["dependencies"]
+
+[tool.setuptools.dynamic]
+dependencies = {file = "requirements/base.txt"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[project.scripts]
+validate-assets = "robot_vla_mujoco.assets.mjcf_loader:main"
+rollout-policy = "robot_vla_mujoco.inference.rollout:main"

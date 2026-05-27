@@ -1,0 +1,9 @@
+# Core MuJoCo simulation dependencies
+mujoco
+numpy
+scipy
+opencv-python
+Pillow
+trimesh
+glfw
+pyyaml

@@ -8,7 +8,6 @@ import torch
 from robot_vla_mujoco.policies.base import PolicyAdapter
 
 try:
-    from lerobot.common.policies.pi0.configuration_pi0 import PI0Config
     from lerobot.common.policies.pi0.modeling_pi0 import PI0Policy
 
     _HAS_PI0 = True
@@ -36,15 +35,11 @@ class PI0Adapter(PolicyAdapter):
         self._action_dim = action_dim
         self._image_size = image_size
 
-        cfg = PI0Config(
-            chunk_size=chunk_size,
-            n_action_steps=n_action_steps,
-        )
-
         self._policy = PI0Policy.from_pretrained(
             checkpoint_path,
-            config=cfg,
         )
+        self._policy.config.chunk_size = chunk_size
+        self._policy.config.n_action_steps = n_action_steps
         self._policy.to(device)
         self._policy.eval()
 
@@ -64,6 +59,8 @@ class PI0Adapter(PolicyAdapter):
         state = observation.get("observation.state")
         if state is None:
             state = np.zeros(self._action_dim, dtype=np.float32)
+        elif state.shape[-1] > self._policy.config.input_features["observation.state"].shape[0]:
+            state = state[..., :self._policy.config.input_features["observation.state"].shape[0]]
 
         front_img = observation.get("observation.images.front")
         wrist_img = observation.get("observation.images.wrist")

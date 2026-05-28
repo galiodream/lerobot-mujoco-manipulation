@@ -38,7 +38,7 @@ class ActionChunkBuffer:
             self._queue.append(trajectory[i].copy())
 
     def get_action(self) -> np.ndarray | None:
-        """Pop the next action from the buffer."""
+        """Pop the next action from the buffer. Returns None if empty."""
         self._step_counter += 1
         if not self._queue:
             return None
@@ -52,6 +52,13 @@ class ActionChunkBuffer:
 
         self._last_action = action
         return action
+
+    def get_action_or_last(self) -> np.ndarray | None:
+        """Return next action, or the last action if buffer is empty, or None if never called."""
+        action = self.get_action()
+        if action is not None:
+            return action
+        return self._last_action.copy() if self._last_action is not None else None
 
     @property
     def is_empty(self) -> bool:

@@ -34,6 +34,8 @@ def main():
     parser = argparse.ArgumentParser(description="Run policy rollout")
     parser.add_argument("--config", default="configs/experiments/omy_dummy_pick_place.yaml")
     parser.add_argument("--policy", default="dummy", help="Policy type: dummy, smolvla, pi0, pi05")
+    parser.add_argument("--scene", default="omy_pick_place",
+                        choices=["omy_pick_place", "ur3e_ag95_pick_place"])
     parser.add_argument("--episodes", type=int, default=10)
     parser.add_argument("--max-steps", type=int, default=150)
     parser.add_argument("--no-viewer", action="store_true", help="Force disable viewer")
@@ -42,18 +44,19 @@ def main():
     parser.add_argument("--camera-height", type=int, default=480)
     args = parser.parse_args()
 
-    # Resolve XML path
-    xml_path = os.path.abspath("assets/mujoco/tasks/pick_place_mug.xml")
+    from robot_vla_mujoco.envs.mujoco_env import MujocoManipulationEnv, resolve_scene
+    from robot_vla_mujoco.policies.base import DummyPolicy
+
+    scene = resolve_scene(args.scene)
+    xml_path = os.path.abspath(scene["scene_xml"])
     if not os.path.exists(xml_path):
         print(f"ERROR: Scene XML not found: {xml_path}")
         sys.exit(1)
 
     use_viewer = not args.no_viewer and _env_bool("MODEL_SIM_VIEWER", True)
 
-    from robot_vla_mujoco.envs.mujoco_env import MujocoManipulationEnv
-    from robot_vla_mujoco.policies.base import DummyPolicy
-
     print(f"Initializing environment...")
+    print(f"  Scene: {args.scene}")
     print(f"  XML: {xml_path}")
     print(f"  Viewer: {use_viewer}")
 
@@ -65,6 +68,8 @@ def main():
         initialize_viewer=use_viewer,
         camera_width=args.camera_width,
         camera_height=args.camera_height,
+        robot_profile=scene["robot_profile"],
+        success_config=scene.get("success_params"),
     )
 
     policy = DummyPolicy(action_dim=7)

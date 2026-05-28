@@ -36,24 +36,33 @@ def _env_bool(name: str, default: bool) -> bool:
 def main():
     parser = argparse.ArgumentParser(description="Collect demonstration episodes")
     parser.add_argument("--mode", default="oracle", choices=["oracle", "teleop"])
+    parser.add_argument("--scene", default="omy_pick_place",
+                        choices=["omy_pick_place", "ur3e_ag95_pick_place"],
+                        help="Scene to use (determines robot + task XML)")
     parser.add_argument("--episodes", type=int, default=10)
     parser.add_argument("--max-steps", type=int, default=400)
-    parser.add_argument("--dataset-name", default="omy_pick_place")
-    parser.add_argument("--dataset-root", default="data/lerobot/omy_pick_place")
-    parser.add_argument("--task", default="pick up the mug and place it on the plate")
+    parser.add_argument("--dataset-name", default=None, help="Override dataset name")
+    parser.add_argument("--dataset-root", default=None, help="Override dataset root")
+    parser.add_argument("--task", default=None, help="Override task description")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--no-viewer", action="store_true")
     parser.add_argument("--fps", type=int, default=20)
-    parser.add_argument("--success-required", action="store_true", default=True,
-                        help="Only save successful episodes")
     args = parser.parse_args()
 
-    use_viewer = not args.no_viewer and _env_bool("MODEL_SIM_VIEWER", True)
-    xml_path = os.path.abspath("assets/mujoco/tasks/pick_place_mug.xml")
-
-    from robot_vla_mujoco.envs.mujoco_env import MujocoManipulationEnv
+    from robot_vla_mujoco.envs.mujoco_env import MujocoManipulationEnv, resolve_scene
     from robot_vla_mujoco.datasets.lerobot_writer import DatasetCollector
 
+    scene = resolve_scene(args.scene)
+    xml_path = os.path.abspath(scene["scene_xml"])
+    robot_profile = scene["robot_profile"]
+    dataset_name = args.dataset_name or scene["dataset_name"]
+    dataset_root = args.dataset_root or scene["dataset_root"]
+    task = args.task or scene["task"]
+
+    use_viewer = not args.no_viewer and _env_bool("MODEL_SIM_VIEWER", True)
+
+    print(f"Scene: {args.scene}")
+    print(f"Robot profile: {robot_profile}")
     print(f"Initializing environment (viewer={use_viewer})...")
     env = MujocoManipulationEnv(
         xml_path=xml_path,
@@ -61,11 +70,13 @@ def main():
         state_type="joint_angle",
         seed=args.seed,
         initialize_viewer=use_viewer,
+        robot_profile=robot_profile,
+        success_config=scene.get("success_params"),
     )
 
     collector = DatasetCollector(
-        repo_id=args.dataset_name,
-        root=args.dataset_root,
+        repo_id=dataset_name,
+        root=dataset_root,
         fps=args.fps,
     )
 
@@ -91,7 +102,7 @@ def _collect_oracle(env, collector, args):
     for ep in range(args.episodes):
         print(f"\n--- Episode {ep + 1}/{args.episodes} ---")
         obs, info = env.reset(seed=args.seed + ep)
-        oracle = PickPlaceOracle(env)
+        oracle = PickPlaceOracle(env, joint_names=env._env.joint_names)
         oracle.reset()
 
         task = obs.get("task", args.task)

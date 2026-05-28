@@ -33,7 +33,7 @@ def _env_bool(name: str, default: bool) -> bool:
     return v.strip().lower() not in {"0", "false", "no", "off"}
 
 
-def _make_env_fn(xml_path: str, seed: int, use_viewer: bool = False):
+def _make_env_fn(xml_path: str, seed: int, robot_profile=None):
     def _fn():
         os.environ["MODEL_SIM_VIEWER"] = "0"  # worker always headless
         from robot_vla_mujoco.envs.mujoco_env import MujocoManipulationEnv
@@ -43,6 +43,7 @@ def _make_env_fn(xml_path: str, seed: int, use_viewer: bool = False):
             state_type="joint_angle",
             seed=seed,
             initialize_viewer=False,
+            robot_profile=robot_profile,
         )
     return _fn
 
@@ -51,6 +52,8 @@ def main():
     parser = argparse.ArgumentParser(description="Evaluate a policy")
     parser.add_argument("--policy", default="dummy", choices=["dummy", "smolvla", "pi0", "pi05"])
     parser.add_argument("--checkpoint", default="", help="Policy checkpoint path")
+    parser.add_argument("--scene", default="omy_pick_place",
+                        choices=["omy_pick_place", "ur3e_ag95_pick_place"])
     parser.add_argument("--episodes", type=int, default=20)
     parser.add_argument("--max-steps", type=int, default=800)
     parser.add_argument("--seed", type=int, default=42)
@@ -61,8 +64,13 @@ def main():
     parser.add_argument("--no-metrics", action="store_true", help="Skip saving metrics")
     args = parser.parse_args()
 
+    from robot_vla_mujoco.envs.mujoco_env import MujocoManipulationEnv, resolve_scene
+
+    scene = resolve_scene(args.scene)
+    xml_path = os.path.abspath(scene["scene_xml"])
+    robot_profile = scene["robot_profile"]
+
     use_viewer = not args.no_viewer and _env_bool("MODEL_SIM_VIEWER", True)
-    xml_path = os.path.abspath("assets/mujoco/tasks/pick_place_mug.xml")
 
     print(f"Evaluation config:")
     print(f"  policy: {args.policy}")
@@ -95,7 +103,7 @@ def main():
     vector_env = None
     if args.num_envs > 1:
         from robot_vla_mujoco.envs.vector_env import SyncVectorEnv
-        env_fns = [_make_env_fn(xml_path, args.seed + i) for i in range(args.num_envs)]
+        env_fns = [_make_env_fn(xml_path, args.seed + i, robot_profile) for i in range(args.num_envs)]
         vector_env = SyncVectorEnv(env_fns)
         print(f"  Created {args.num_envs} parallel envs")
 
@@ -113,6 +121,8 @@ def main():
             state_type="joint_angle",
             seed=args.seed,
             initialize_viewer=use_viewer,
+            robot_profile=robot_profile,
+            success_config=scene.get("success_params"),
         )
 
     print("\nStarting evaluation...")

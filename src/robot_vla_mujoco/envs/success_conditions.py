@@ -50,7 +50,11 @@ class PickPlaceCondition:
         p_target = env.mujoco_parser.get_p_body(self._target_body)
         xy_dist = float(np.linalg.norm(p_obj[:2] - p_target[:2]))
         z_diff = float(np.abs(p_obj[2] - p_target[2]))
-        gripper = float(env.mujoco_parser.get_qpos_joint(self._gripper_joint)[0])
+        # Read gripper: use SimpleEnv2 helper if available (handles both tendon & position)
+        if hasattr(env._env, '_read_gripper_raw'):
+            gripper = env._env._read_gripper_raw()
+        else:
+            gripper = float(env.mujoco_parser.get_qpos_joint(self._gripper_joint)[0])
         ee_z = float(env.mujoco_parser.get_p_body(self._ee_body)[2])
 
         obj_on_target = xy_dist < self._distance_threshold and z_diff < 0.6

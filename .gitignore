@@ -39,3 +39,4 @@ checkpoints/
 
 # Demo data
 demo_data*/
+MUJOCO_LOG.TXT

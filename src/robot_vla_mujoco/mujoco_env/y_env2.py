@@ -11,31 +11,96 @@ import copy
 import glfw
 import mujoco
 
+# Default robot profiles
+_ROBOT_PROFILES = {
+    "omy": {
+        "joint_names": ["joint1", "joint2", "joint3", "joint4", "joint5", "joint6"],
+        "gripper_type": "position",  # 4 independent position actuators
+        "gripper_actuators": ["actuator_rh_r1", "actuator_rh_r2", "actuator_rh_l1", "actuator_rh_l2"],
+        "gripper_joint": "rh_r1",  # joint to read gripper open/close state
+        "ee_body": "tcp_link",
+        "n_arm_joints": 6,
+        "n_gripper_actuators": 4,
+        "gripper_open_val": 1.0,
+        "gripper_close_val": 0.0,
+        "ik_target_pos": np.array([0.3, 0.0, 1.0]),
+        "ik_target_rpy": np.deg2rad([90, -0., 90]),
+        "plate_xyz": np.array([0.3, -0.25, 0.82]),
+        "mug_red_range": {"x": [+0.32, +0.33], "y": [-0.00, +0.02], "z": [0.83, 0.83]},
+        "mug_blue_range": {"x": [+0.29, +0.3], "y": [0.19, 0.21], "z": [0.83, 0.83]},
+        "sim_settle_steps": 100,
+        "viewer_distance": 2.0,
+        "viewer_elevation": -30,
+        "viewer_lookat": [0.3, 0.0, 0.5],
+    },
+    "ur3e_ag95": {
+        "joint_names": ["shoulder_pan_joint", "shoulder_lift_joint", "elbow_joint",
+                        "wrist_1_joint", "wrist_2_joint", "wrist_3_joint"],
+        "gripper_type": "tendon",  # single tendon-driven actuator
+        "gripper_actuators": ["fingers_actuator"],
+        "gripper_joint": "fingers_actuator",  # actuator name for reading gripper state
+        "ee_body": "tcp_link",
+        "n_arm_joints": 6,
+        "n_gripper_actuators": 1,
+        "gripper_open_val": 0.0,
+        "gripper_close_val": 0.9,
+        "ik_target_pos": np.array([0.5, 0.0, 1.0]),
+        "ik_target_rpy": np.deg2rad([90, -0., 90]),
+        "plate_xyz": np.array([0.5, -0.2, 0.82]),
+        "mug_red_range": {"x": [+0.45, +0.50], "y": [-0.05, +0.05], "z": [0.83, 0.83]},
+        "mug_blue_range": {"x": [+0.45, +0.50], "y": [0.15, 0.25], "z": [0.83, 0.83]},
+        "sim_settle_steps": 100,
+        "viewer_distance": 3.0,
+        "viewer_elevation": -25,
+        "viewer_lookat": [0.5, 0.0, 0.5],
+    },
+}
+
+
 class SimpleEnv2:
-    def __init__(self, 
+    def __init__(self,
                  xml_path,
-                action_type='eef_pose', 
-                state_type='joint_angle',
-                seed = None,
-                initialize_viewer=True):
+                 action_type='eef_pose',
+                 state_type='joint_angle',
+                 seed=None,
+                 initialize_viewer=True,
+                 robot_profile=None):
         """
         args:
             xml_path: str, path to the xml file
             action_type: str, type of action space, 'eef_pose','delta_joint_angle' or 'joint_angle'
             state_type: str, type of state space, 'joint_angle' or 'ee_pose'
             seed: int, seed for random number generator
+            robot_profile: str or dict, robot profile name ("omy", "ur3e_ag95") or dict override
         """
+        # Resolve robot profile
+        if robot_profile is None:
+            robot_profile = "omy"
+        if isinstance(robot_profile, str):
+            if robot_profile not in _ROBOT_PROFILES:
+                raise ValueError(f"Unknown robot profile '{robot_profile}'. Available: {list(_ROBOT_PROFILES.keys())}")
+            self._rp = _ROBOT_PROFILES[robot_profile].copy()
+        else:
+            # Merge dict override with defaults
+            defaults = _ROBOT_PROFILES.get(robot_profile, _ROBOT_PROFILES["omy"]).copy()
+            defaults.update(robot_profile)
+            self._rp = defaults
+
+        self.joint_names = self._rp["joint_names"]
+        self._gripper_type = self._rp["gripper_type"]
+        self._gripper_actuators = self._rp["gripper_actuators"]
+        self._gripper_joint = self._rp["gripper_joint"]
+        self._ee_body = self._rp["ee_body"]
+        self._n_arm_joints = self._rp["n_arm_joints"]
+        self._n_gripper_actuators = self._rp["n_gripper_actuators"]
+        self._gripper_open_val = self._rp["gripper_open_val"]
+        self._gripper_close_val = self._rp["gripper_close_val"]
+
         # Load the xml file
-        self.env = MuJoCoParserClass(name='Tabletop',rel_xml_path=xml_path)
+        self.env = MuJoCoParserClass(name='Tabletop', rel_xml_path=xml_path)
         self.action_type = action_type
         self.state_type = state_type
 
-        self.joint_names = ['joint1',
-                    'joint2',
-                    'joint3',
-                    'joint4',
-                    'joint5',
-                    'joint6',]
         if initialize_viewer:
             self.init_viewer()
         else:
@@ -52,8 +117,9 @@ class SimpleEnv2:
             width             = 960,
             height            = 720,
             fontscale         = 150,
-            distance          = 2.0,
-            elevation         = -30,
+            distance          = self._rp["viewer_distance"],
+            elevation         = self._rp["viewer_elevation"],
+            lookat            = self._rp["viewer_lookat"],
             transparent       = False,
             black_sky         = True,
             use_rgb_overlay = False,
@@ -64,38 +130,41 @@ class SimpleEnv2:
         Reset the environment
         Move the robot to a initial position, set the object positions based on the seed
         '''
-        if seed != None: np.random.seed(seed=0) 
+        if seed != None: np.random.seed(seed=0)
         q_init = np.deg2rad([0,0,0,0,0,0])
         q_zero,ik_err_stack,ik_info = solve_ik(
             env = self.env,
             joint_names_for_ik = self.joint_names,
-            body_name_trgt     = 'tcp_link',
+            body_name_trgt     = self._ee_body,
             q_init       = q_init, # ik from zero pose
-            p_trgt       = np.array([0.3,0.0,1.0]),
-            R_trgt       = rpy2r(np.deg2rad([90,-0.,90 ])),
+            p_trgt       = self._rp["ik_target_pos"],
+            R_trgt       = rpy2r(self._rp["ik_target_rpy"]),
         )
         self.env.forward(q=q_zero,joint_names=self.joint_names,increase_tick=False)
-        
+
         # set plate position
-        plate_xyz = np.array([0.3, -0.25, 0.82])
+        plate_xyz = self._rp["plate_xyz"]
         self.env.set_p_base_body(body_name='body_obj_plate_11',p=plate_xyz)
         self.env.set_R_base_body(body_name='body_obj_plate_11',R=np.eye(3,3))
-        # Set object positions
+        # Set red mug position
+        mr = self._rp["mug_red_range"]
         obj_xyzs = sample_xyzs(
             1,
-            x_range   = [+0.32,+0.33],
-            y_range   = [-0.00,+0.02],
-            z_range   = [0.83,0.83],
+            x_range   = mr["x"],
+            y_range   = mr["y"],
+            z_range   = mr["z"],
             min_dist  = 0.16,
             xy_margin = 0.0
         )
         self.env.set_p_base_body(body_name='body_obj_mug_5',p=obj_xyzs[0,:])
         self.env.set_R_base_body(body_name='body_obj_mug_5',R=np.eye(3,3))
+        # Set blue mug position
+        mb = self._rp["mug_blue_range"]
         obj_xyzs = sample_xyzs(
             1,
-            x_range   = [+0.29,+0.3],
-            y_range   = [0.19,+0.21],
-            z_range   = [0.83,0.83],
+            x_range   = mb["x"],
+            y_range   = mb["y"],
+            z_range   = mb["z"],
             min_dist  = 0.16,
             xy_margin = 0.0
         )
@@ -105,11 +174,15 @@ class SimpleEnv2:
 
         # Set the initial pose of the robot
         self.last_q = copy.deepcopy(q_zero)
-        self.q = np.concatenate([q_zero, np.array([0.0]*4)])
-        self.p0, self.R0 = self.env.get_pR_body(body_name='tcp_link')
+        # Build full qpos: arm joints + gripper actuators
+        if self._gripper_type == "tendon":
+            self.q = np.concatenate([q_zero, np.array([self._gripper_open_val])])
+        else:
+            self.q = np.concatenate([q_zero, np.array([self._gripper_open_val] * self._n_gripper_actuators)])
+        self.p0, self.R0 = self.env.get_pR_body(body_name=self._ee_body)
         mug_red_init_pose, mug_blue_init_pose, plate_init_pose = self.get_obj_pose()
         self.obj_init_pose = np.concatenate([mug_red_init_pose, mug_blue_init_pose, plate_init_pose],dtype=np.float32)
-        for _ in range(100):
+        for _ in range(self._rp["sim_settle_steps"]):
             self.step_env()
         self.set_instruction()
         print("DONE INITIALIZATION")
@@ -174,7 +247,7 @@ class SimpleEnv2:
             q ,ik_err_stack,ik_info = solve_ik(
                 env                = self.env,
                 joint_names_for_ik = self.joint_names,
-                body_name_trgt     = 'tcp_link',
+                body_name_trgt     = self._ee_body,
                 q_init             = q,
                 p_trgt             = self.p0,
                 R_trgt             = self.R0,
@@ -191,9 +264,14 @@ class SimpleEnv2:
             q = action[:-1]
         else:
             raise ValueError('action_type not recognized')
-        
-        gripper_cmd = np.array([action[-1]]*4)
-        gripper_cmd[[1,3]] *= 0.8
+
+        # Build gripper command based on gripper type
+        if self._gripper_type == "tendon":
+            gripper_cmd = np.array([action[-1]])
+        else:
+            gripper_cmd = np.array([action[-1]] * self._n_gripper_actuators)
+            if self._n_gripper_actuators == 4:
+                gripper_cmd[[1, 3]] *= 0.8
         self.compute_q = q
         q = np.concatenate([q, gripper_cmd])
 
@@ -259,7 +337,7 @@ class SimpleEnv2:
             return
 
         self.env.plot_time()
-        p_current, R_current = self.env.get_pR_body(body_name='tcp_link')
+        p_current, R_current = self.env.get_pR_body(body_name=self._ee_body)
         R_current = R_current @ np.array([[1,0,0],[0,0,1],[0,1,0 ]])
         self.env.plot_sphere(p=p_current, r=0.02, rgba=[0.95,0.05,0.05,0.5])
         self.env.plot_capsule(p=p_current, R=R_current, r=0.01, h=0.2, rgba=[0.05,0.95,0.05,0.5])
@@ -278,6 +356,30 @@ class SimpleEnv2:
             self.env.viewer_text_overlay(text1='Language Instructions',text2=language_instructions)
         self.env.render()
 
+    def _read_gripper_val(self) -> float:
+        """Read current gripper state (0=open, 1=closed)."""
+        if self._gripper_type == "tendon":
+            try:
+                idx = self.env.ctrl_names.index(self._gripper_joint)
+                val = float(self.env.data.ctrl[idx])
+            except (ValueError, IndexError):
+                val = 0.0
+            return 1.0 if val > 0.1 else 0.0
+        else:
+            gripper = self.env.get_qpos_joint(self._gripper_joint)
+            return 1.0 if gripper[0] > 0.5 else 0.0
+
+    def _read_gripper_raw(self) -> float:
+        """Read raw gripper sensor/actuator value."""
+        if self._gripper_type == "tendon":
+            try:
+                idx = self.env.ctrl_names.index(self._gripper_joint)
+                return float(self.env.data.ctrl[idx])
+            except (ValueError, IndexError):
+                return 0.0
+        else:
+            return float(self.env.get_qpos_joint(self._gripper_joint)[0])
+
     def get_joint_state(self):
         '''
         Get the joint state of the robot
@@ -286,8 +388,7 @@ class SimpleEnv2:
             [j1,j2,j3,j4,j5,j6,gripper]
         '''
         qpos = self.env.get_qpos_joints(joint_names=self.joint_names)
-        gripper = self.env.get_qpos_joint('rh_r1')
-        gripper_cmd = 1.0 if gripper[0] > 0.5 else 0.0
+        gripper_cmd = self._read_gripper_val()
         return np.concatenate([qpos, [gripper_cmd]],dtype=np.float32)
     
     def teleop_robot(self):
@@ -371,8 +472,7 @@ class SimpleEnv2:
         '''
         delta = self.compute_q - self.last_q
         self.last_q = copy.deepcopy(self.compute_q)
-        gripper = self.env.get_qpos_joint('rh_r1')
-        gripper_cmd = 1.0 if gripper[0] > 0.5 else 0.0
+        gripper_cmd = self._read_gripper_val()
         return np.concatenate([delta, [gripper_cmd]],dtype=np.float32)
 
     def check_success(self):
@@ -383,8 +483,8 @@ class SimpleEnv2:
         '''
         p_mug = self.env.get_p_body(self.obj_target)
         p_plate = self.env.get_p_body('body_obj_plate_11')
-        if np.linalg.norm(p_mug[:2] - p_plate[:2]) < 0.1 and np.linalg.norm(p_mug[2] - p_plate[2]) < 0.6 and self.env.get_qpos_joint('rh_r1') < 0.1:
-            p = self.env.get_p_body('tcp_link')[2]
+        if np.linalg.norm(p_mug[:2] - p_plate[:2]) < 0.1 and np.linalg.norm(p_mug[2] - p_plate[2]) < 0.6 and self._read_gripper_raw() < 0.1:
+            p = self.env.get_p_body(self._ee_body)[2]
             if p > 0.9:
                 return True
         return False
@@ -423,6 +523,6 @@ class SimpleEnv2:
         '''
         get the end effector pose of the robot + gripper state
         '''
-        p, R = self.env.get_pR_body(body_name='tcp_link')
+        p, R = self.env.get_pR_body(body_name=self._ee_body)
         rpy = r2rpy(R)
         return np.concatenate([p, rpy],dtype=np.float32)

@@ -38,6 +38,7 @@ class MujocoManipulationEnv:
         camera_width: int = 640,
         camera_height: int = 480,
         success_config: dict | None = None,
+        robot_profile: str | dict | None = None,
     ):
         if initialize_viewer is None:
             initialize_viewer = _env_bool("MODEL_SIM_VIEWER", True)
@@ -47,6 +48,7 @@ class MujocoManipulationEnv:
         self._xml_path = xml_path
         self._action_type = action_type
         self._state_type = state_type
+        self._robot_profile = robot_profile
 
         self._env = SimpleEnv2(
             xml_path=xml_path,
@@ -54,6 +56,7 @@ class MujocoManipulationEnv:
             state_type=state_type,
             seed=seed,
             initialize_viewer=initialize_viewer,
+            robot_profile=robot_profile,
         )
 
         if not initialize_viewer:
@@ -179,3 +182,33 @@ class MujocoManipulationEnv:
     @property
     def mujoco_data(self) -> mujoco.MjData:
         return self._env.env.data
+
+
+# Scene-to-robot-profile mapping
+SCENE_REGISTRY = {
+    "omy_pick_place": {
+        "scene_xml": "assets/mujoco/tasks/pick_place_mug.xml",
+        "robot_profile": "omy",
+        "dataset_name": "omy_pick_place",
+        "dataset_root": "data/lerobot/omy_pick_place",
+        "task": "pick up the mug and place it on the plate",
+    },
+    "ur3e_ag95_pick_place": {
+        "scene_xml": "assets/mujoco/tasks/pick_place_mug_ur3e.xml",
+        "robot_profile": "ur3e_ag95",
+        "dataset_name": "ur3e_ag95_pick_place",
+        "dataset_root": "data/lerobot/ur3e_ag95_pick_place",
+        "task": "pick up the mug and place it on the plate",
+        "success_params": {
+            "gripper_joint": "fingers_actuator",
+        },
+    },
+}
+
+
+def resolve_scene(scene_name: str) -> dict:
+    """Resolve a scene name to its config dict."""
+    if scene_name not in SCENE_REGISTRY:
+        available = list(SCENE_REGISTRY.keys())
+        raise ValueError(f"Unknown scene '{scene_name}'. Available: {available}")
+    return SCENE_REGISTRY[scene_name]

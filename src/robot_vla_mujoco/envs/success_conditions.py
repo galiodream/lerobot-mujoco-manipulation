@@ -34,13 +34,16 @@ class PickPlaceCondition:
         self._success = False
 
     def reset(self, env, success_params: dict, task_context: dict | None = None) -> None:
-        self._object_body = success_params.get("object_body", "body_obj_mug_5")
+        default_object = getattr(getattr(env, "_env", None), "obj_target", "body_obj_mug_5")
+        self._object_body = success_params.get("object_body", default_object)
         self._target_body = success_params.get("target_body", "body_obj_plate_11")
         self._distance_threshold = success_params.get("distance_threshold", 0.05)
         self._stable_steps = success_params.get("stable_steps", 10)
-        self._gripper_joint = success_params.get("gripper_joint", "rh_r1")
+        default_gripper_joint = getattr(getattr(env, "_env", None), "_gripper_joint", "rh_r1")
+        self._gripper_joint = success_params.get("gripper_joint", default_gripper_joint)
         self._gripper_threshold = success_params.get("gripper_threshold", 0.1)
-        self._ee_body = success_params.get("ee_body", "tcp_link")
+        default_ee_body = getattr(getattr(env, "_env", None), "_ee_body", "tcp_link")
+        self._ee_body = success_params.get("ee_body", default_ee_body)
         self._ee_release_height = success_params.get("ee_release_height", 0.9)
         self._stable_count = 0
         self._success = False

@@ -5,7 +5,7 @@ import xml.etree.ElementTree as ET
 from robot_vla_mujoco.mujoco_env.mujoco_parser import MuJoCoParserClass
 from robot_vla_mujoco.mujoco_env.utils import prettify, sample_xyzs, rotation_matrix, add_title_to_img
 from robot_vla_mujoco.mujoco_env.ik import solve_ik
-from robot_vla_mujoco.mujoco_env.transforms import rpy2r, r2rpy
+from robot_vla_mujoco.mujoco_env.transforms import rpy2r, r2rpy, r2quat
 import os
 import copy
 import glfw
@@ -32,6 +32,10 @@ _ROBOT_PROFILES = {
         "viewer_distance": 2.0,
         "viewer_elevation": -30,
         "viewer_lookat": [0.3, 0.0, 0.5],
+        "ik_max_tick": 200,
+        "ik_stepsize": 1.0,
+        "ik_eps": 1e-2,
+        "ik_err_th": 1e-2,
     },
     "ur3e_ag95": {
         "joint_names": ["shoulder_pan_joint", "shoulder_lift_joint", "elbow_joint",
@@ -46,13 +50,28 @@ _ROBOT_PROFILES = {
         "gripper_close_val": 0.9,
         "ik_target_pos": np.array([0.5, 0.0, 1.0]),
         "ik_target_rpy": np.deg2rad([90, -0., 90]),
-        "plate_xyz": np.array([0.5, -0.2, 0.82]),
-        "mug_red_range": {"x": [+0.45, +0.50], "y": [-0.05, +0.05], "z": [0.83, 0.83]},
-        "mug_blue_range": {"x": [+0.45, +0.50], "y": [0.15, 0.25], "z": [0.83, 0.83]},
-        "sim_settle_steps": 100,
+        "plate_xyz": np.array([0.35, -0.30, 0.81]),
+        "mug_red_range": {"x": [+0.30, +0.35], "y": [-0.05, +0.00], "z": [0.85, 0.85]},
+        "mug_blue_range": {"x": [+0.30, +0.35], "y": [0.18, 0.23], "z": [0.85, 0.85]},
+        "sim_settle_steps": 80,
         "viewer_distance": 3.0,
         "viewer_elevation": -25,
         "viewer_lookat": [0.5, 0.0, 0.5],
+        "ik_max_tick": 300,
+        "ik_stepsize": 2.0,
+        "ik_eps": 1e-2,
+        "ik_err_th": 5e-2,
+        "oracle_config": {
+            "ee_body": "oracle_grasp_body",
+            "target_rpy_deg": (90.0, 0.0, 90.0),
+            "pre_grasp_z_offset": 0.18,
+            "grasp_z_offset": 0.02,
+            "lift_z_offset": 0.20,
+            "place_z_offset": 0.12,
+            "ik_stepsize": 2.0,
+            "ik_eps": 1e-2,
+            "max_stage_steps": 50,
+        },
     },
 }
 
@@ -96,16 +115,21 @@ class SimpleEnv2:
         self._gripper_open_val = self._rp["gripper_open_val"]
         self._gripper_close_val = self._rp["gripper_close_val"]
 
-        # Load the xml file
-        self.env = MuJoCoParserClass(name='Tabletop', rel_xml_path=xml_path)
+        print("[SimpleEnv2] Loading MuJoCo model...")
+        # Load the xml file (verbose=False to suppress model info printout)
+        self.env = MuJoCoParserClass(name='Tabletop', rel_xml_path=xml_path, verbose=False)
         self.action_type = action_type
         self.state_type = state_type
 
-        if initialize_viewer:
-            self.init_viewer()
-        else:
-            self.env.reset()
+        # Finish the heavy reset path before opening the viewer window, otherwise
+        # the OS marks the fresh window as unresponsive while initialization blocks.
+        print("[SimpleEnv2] Preparing simulation state...")
+        self.env.reset()
         self.reset(seed)
+        if initialize_viewer:
+            print("[SimpleEnv2] Opening viewer window...")
+            self.init_viewer(reset_env=False)
+        print("[SimpleEnv2] Environment ready.")
 
     def init_viewer(self, reset_env=True):
         '''
@@ -130,7 +154,10 @@ class SimpleEnv2:
         Reset the environment
         Move the robot to a initial position, set the object positions based on the seed
         '''
-        if seed != None: np.random.seed(seed=0)
+        print(f"[SimpleEnv2] Resetting task scene (seed={seed})...")
+        if seed is not None:
+            np.random.seed(seed)
+            random.seed(seed)
         q_init = np.deg2rad([0,0,0,0,0,0])
         q_zero,ik_err_stack,ik_info = solve_ik(
             env = self.env,
@@ -139,55 +166,67 @@ class SimpleEnv2:
             q_init       = q_init, # ik from zero pose
             p_trgt       = self._rp["ik_target_pos"],
             R_trgt       = rpy2r(self._rp["ik_target_rpy"]),
+            max_ik_tick  = self._rp.get("ik_max_tick", 200),
+            ik_stepsize  = self._rp.get("ik_stepsize", 1.0),
+            ik_eps       = self._rp.get("ik_eps", 1e-2),
+            ik_err_th    = self._rp.get("ik_err_th", 1e-2),
         )
         self.env.forward(q=q_zero,joint_names=self.joint_names,increase_tick=False)
 
-        # set plate position
-        plate_xyz = self._rp["plate_xyz"]
-        self.env.set_p_base_body(body_name='body_obj_plate_11',p=plate_xyz)
-        self.env.set_R_base_body(body_name='body_obj_plate_11',R=np.eye(3,3))
-        # Set red mug position
-        mr = self._rp["mug_red_range"]
-        obj_xyzs = sample_xyzs(
-            1,
-            x_range   = mr["x"],
-            y_range   = mr["y"],
-            z_range   = mr["z"],
-            min_dist  = 0.16,
-            xy_margin = 0.0
-        )
-        self.env.set_p_base_body(body_name='body_obj_mug_5',p=obj_xyzs[0,:])
-        self.env.set_R_base_body(body_name='body_obj_mug_5',R=np.eye(3,3))
-        # Set blue mug position
-        mb = self._rp["mug_blue_range"]
-        obj_xyzs = sample_xyzs(
-            1,
-            x_range   = mb["x"],
-            y_range   = mb["y"],
-            z_range   = mb["z"],
-            min_dist  = 0.16,
-            xy_margin = 0.0
-        )
-        self.env.set_p_base_body(body_name='body_obj_mug_6',p=obj_xyzs[0,:])
-        self.env.set_R_base_body(body_name='body_obj_mug_6',R=np.eye(3,3))
-        self.env.forward(increase_tick=False)
-
-        # Set the initial pose of the robot
+        # Initialize q for step_env() during settling
         self.last_q = copy.deepcopy(q_zero)
-        # Build full qpos: arm joints + gripper actuators
         if self._gripper_type == "tendon":
             self.q = np.concatenate([q_zero, np.array([self._gripper_open_val])])
         else:
             self.q = np.concatenate([q_zero, np.array([self._gripper_open_val] * self._n_gripper_actuators)])
+
+        settle_short = max(20, self._rp["sim_settle_steps"] // 4)
+
+        # Place freejoint task objects directly near the tabletop height. Dropping
+        # the meshes from height can inject large contact impulses in the UR3e scene.
+        self._set_free_body_pose('body_obj_plate_11', self._rp["plate_xyz"], np.eye(3, 3))
+
+        # 2. Place red mug
+        mr = self._rp["mug_red_range"]
+        obj_xyzs = sample_xyzs(1, x_range=mr["x"], y_range=mr["y"], z_range=mr["z"],
+                               min_dist=0.16, xy_margin=0.0)
+        self._set_free_body_pose('body_obj_mug_5', obj_xyzs[0, :], np.eye(3, 3))
+
+        # 3. Place blue mug
+        mb = self._rp["mug_blue_range"]
+        obj_xyzs = sample_xyzs(1, x_range=mb["x"], y_range=mb["y"], z_range=mb["z"],
+                               min_dist=0.16, xy_margin=0.0)
+        self._set_free_body_pose('body_obj_mug_6', obj_xyzs[0, :], np.eye(3, 3))
+
+        for _ in range(settle_short):
+            self.step_env()
+        self._zero_free_body_velocity('body_obj_plate_11')
+        self._zero_free_body_velocity('body_obj_mug_5')
+        self._zero_free_body_velocity('body_obj_mug_6')
+        mujoco.mj_forward(self.env.model, self.env.data)
+
+        # Record initial TCP pose
         self.p0, self.R0 = self.env.get_pR_body(body_name=self._ee_body)
         mug_red_init_pose, mug_blue_init_pose, plate_init_pose = self.get_obj_pose()
         self.obj_init_pose = np.concatenate([mug_red_init_pose, mug_blue_init_pose, plate_init_pose],dtype=np.float32)
-        for _ in range(self._rp["sim_settle_steps"]):
-            self.step_env()
         self.set_instruction()
-        print("DONE INITIALIZATION")
+        print(f"[SimpleEnv2] Reset complete. Task: {self.instruction}")
         self.gripper_state = False
         self.past_chars = []
+
+    def _set_free_body_pose(self, body_name: str, p: np.ndarray, R: np.ndarray) -> None:
+        jntadr = self.env.model.body(body_name).jntadr[0]
+        qposadr = self.env.model.jnt_qposadr[jntadr]
+        self.env.data.qpos[qposadr:qposadr + 3] = p
+        self.env.data.qpos[qposadr + 3:qposadr + 7] = r2quat(R)
+        self._zero_free_body_velocity(body_name)
+        mujoco.mj_forward(self.env.model, self.env.data)
+
+    def _zero_free_body_velocity(self, body_name: str) -> None:
+        jntadr = self.env.model.body(body_name).jntadr[0]
+        dofadr = self.env.model.jnt_dofadr[jntadr]
+        self.env.data.qvel[dofadr:dofadr + 6] = 0.0
+        self.env.data.qacc[dofadr:dofadr + 6] = 0.0
 
     def init_offscreen_renderer(self, width=640, height=480):
         """Initialize a MuJoCo Renderer for headless fixed-camera images."""

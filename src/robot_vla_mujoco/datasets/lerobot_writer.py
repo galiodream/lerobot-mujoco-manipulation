@@ -65,11 +65,16 @@ def ensure_dataset(
 
     root = Path(root)
     meta_dir = root / "meta"
-    if meta_dir.exists() and (meta_dir / "info.json").exists():
-        # Re-open existing dataset
-        return LeRobotDataset(repo_id=repo_id, root=root)
 
-    # Clean up incomplete dataset dir
+    # Try to re-open existing dataset
+    if meta_dir.exists() and (meta_dir / "info.json").exists():
+        try:
+            return LeRobotDataset(repo_id=repo_id, root=root)
+        except Exception:
+            # Dataset is incomplete or corrupted — delete and recreate
+            shutil.rmtree(root)
+
+    # Clean up any stale directory
     if root.exists():
         shutil.rmtree(root)
 

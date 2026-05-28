@@ -49,6 +49,7 @@ class MujocoManipulationEnv:
         self._action_type = action_type
         self._state_type = state_type
         self._robot_profile = robot_profile
+        self._success_config = success_config or {}
 
         self._env = SimpleEnv2(
             xml_path=xml_path,
@@ -63,9 +64,8 @@ class MujocoManipulationEnv:
             self._env.init_offscreen_renderer(width=camera_width, height=camera_height)
 
         # Success condition
-        sc = success_config or {}
-        sc_type = sc.get("type", "pick_place")
-        sc_params = sc.get("params", {})
+        sc_type = self._success_config.get("type", "pick_place")
+        sc_params = self._success_config.get("params", {})
         cls = SUCCESS_CONDITION_REGISTRY.get(sc_type)
         self._success_condition = cls()
         self._success_condition.reset(self, sc_params)
@@ -90,7 +90,7 @@ class MujocoManipulationEnv:
             self._success_condition = cls()
             self._success_condition.reset(self, sc_config.get("params", {}))
         else:
-            self._success_condition.reset(self, {})
+            self._success_condition.reset(self, self._success_config.get("params", {}))
 
         obs = self.get_observation()
         info = self._build_info()

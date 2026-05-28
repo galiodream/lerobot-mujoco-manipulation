@@ -35,6 +35,9 @@ def _is_standalone_xml(xml_path: str) -> bool:
     basename = os.path.basename(xml_path)
     if basename.startswith("obj_"):
         return False
+    # Robot XMLs with mesh paths relative to task scene (not standalone)
+    if "ur3e_ag95.xml" in xml_path:
+        return False
     return True
 
 

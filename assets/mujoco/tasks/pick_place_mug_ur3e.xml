@@ -1,0 +1,32 @@
+<mujoco model="UR3eAG95PickPlaceScene">
+    <size memory="500M"/>
+
+    <option integrator="Euler" noslip_iterations="10" />
+    <default>
+        <joint armature="0.1" damping="0.1" />
+        <default class="visual_only">
+            <geom type="mesh" contype="0" conaffinity="0" group="2" />
+        </default>
+        <default class="no_visual_collision">
+            <geom type="capsule" solimp=".9 .99 .001" solref=".015 1" group="3" />
+        </default>
+        <default class="visual_collision">
+            <geom type="mesh" solimp=".9 .99 .001" solref=".015 1" group="2" />
+        </default>
+    </default>
+
+    <!-- Sky and floor -->
+    <include file="../arenas/object/floor_isaac_style.xml" />
+
+    <!-- Table with cameras (reuse existing) -->
+    <include file="../arenas/object/object_table.xml" />
+
+    <!-- UR3e + AG95 6-DOF Arm with gripper -->
+    <include file="../robots/ur3e_ag95/ur3e_ag95.xml" />
+
+    <!-- Task objects: two mugs and a plate -->
+    <include file="../objects/mugs/mug_5/model_new.xml"/>
+    <include file="../objects/plates/plate_11/model_new.xml"/>
+    <include file="../objects/mugs/mug_6/model_new.xml"/>
+
+</mujoco>

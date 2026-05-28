@@ -14,6 +14,17 @@ assets:
     conversion_required: false
     notes: "Open Manipulator Y (OMY) 6-DOF arm with parallel gripper. First baseline robot."
 
+  - name: ur3e_ag95_robot
+    type: robot
+    source_url: https://github.com/hangtingLiu/UR3e_AG95_Grasp_public
+    license: "check upstream repository before redistribution"
+    version: "main@<commit-sha>"
+    local_path: assets/mujoco/robots/ur3e_ag95
+    scale: 1.0
+    orientation_fix: null
+    conversion_required: false
+    notes: "UR3e 6-DOF arm + AG95 tendon-driven gripper. Meshes from hangtingLiu/UR3e_AG95_Grasp_public."
+
   - name: tabletop_arena
     type: arena
     source_url: https://github.com/galiodream/lerobot-mujuco

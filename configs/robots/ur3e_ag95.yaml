@@ -1,0 +1,31 @@
+# Robot profile: UR3e + AG95 6-DOF arm with tendon-driven gripper
+name: ur3e_ag95
+arm_dof: 6
+gripper_dof: 1
+action_dim: 7
+state_dim: 7
+
+mujoco:
+  scene_xml: assets/mujoco/robots/ur3e_ag95/ur3e_ag95.xml
+  end_effector_body: tcp_link
+  gripper_actuator: fingers_actuator
+
+control:
+  action_mode: joint_position
+  joint_names:
+    - shoulder_pan_joint
+    - shoulder_lift_joint
+    - elbow_joint
+    - wrist_1_joint
+    - wrist_2_joint
+    - wrist_3_joint
+  gripper:
+    open_value: 0.0      # 0 = open (ctrl 0 maps to open position)
+    close_value: 0.943    # 0.943 = closed (max ctrl maps to closed)
+
+lerobot_features:
+  images:
+    front: observation.images.front
+    wrist: observation.images.wrist
+  state: observation.state
+  action: action

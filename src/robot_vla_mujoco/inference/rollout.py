@@ -44,11 +44,12 @@ def run_rollout(
     obs, info = env.reset(seed=seed)
     task = obs.get("task", "")
     async_engine.reset(task)
-    async_engine.update_observation(obs)
 
     # Prime the buffer with a synchronous first inference
     new_traj = policy.predict_action_trajectory(obs)
     chunk_buffer.add_trajectory(new_traj)
+
+    async_engine.update_observation(obs)
 
     episode_reward = 0.0
 

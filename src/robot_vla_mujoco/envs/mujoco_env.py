@@ -96,7 +96,7 @@ class MujocoManipulationEnv:
     def step(self, action: np.ndarray) -> tuple[dict[str, Any], float, bool, bool, dict[str, Any]]:
         self._env.step(action)
         sim_dt = self._env.env.model.opt.timestep
-        physics_steps = max(1, round((1.0 / 60.0) / sim_dt))
+        physics_steps = max(1, round(0.15 / sim_dt))
         self._env.step_env(nstep=physics_steps)
         self._step_count += 1
 

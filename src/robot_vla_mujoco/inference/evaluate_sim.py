@@ -126,9 +126,9 @@ def evaluate_policy(
                 episode_idx=ep,
             )
             results.append(result)
-            if not render and ep % max(1, num_episodes // 10) == 0:
-                print(f"  Episode {ep + 1}/{num_episodes}: "
-                      f"success={result['success']} steps={result['steps']}")
+            print(f"  Episode {ep + 1}/{num_episodes}: "
+                  f"success={result['success']} steps={result['steps']} "
+                  f"reward={result['reward']:.2f} fps={result['fps']:.0f}")
 
     t_end = time.perf_counter()
 

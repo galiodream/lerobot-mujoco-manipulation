@@ -13,23 +13,6 @@ from robot_vla_mujoco.policies.base import PolicyAdapter
 
 
 class AsyncInferenceEngine:
-    """Wraps a policy and runs continuous inference in a background thread.
-
-    The worker always has the latest observation and continuously produces new
-    action trajectories. The main loop picks up the latest trajectory.
-
-    Usage:
-        engine = AsyncInferenceEngine(policy)
-        engine.reset(task)
-        engine.update_observation(obs)
-
-        # In your render loop:
-        traj = engine.collect_trajectory()  # returns full trajectory if new
-        engine.update_observation(next_obs)
-
-        engine.close()
-    """
-
     def __init__(self, policy: PolicyAdapter):
         self._policy = policy
 
@@ -37,6 +20,7 @@ class AsyncInferenceEngine:
         self._latest_obs: dict[str, Any] | None = None
         self._obs_updated = False
         self._running = True
+        self._inferring = False
         self._lock = threading.Lock()
         self._event = threading.Event()
 
@@ -45,8 +29,13 @@ class AsyncInferenceEngine:
 
     def reset(self, task: str) -> None:
         self._policy.reset(task)
-        self._result_traj = None
-        self._latest_obs = None
+        with self._lock:
+            self._result_traj = None
+            self._latest_obs = None
+
+    def is_idle(self) -> bool:
+        with self._lock:
+            return not self._inferring
 
     def update_observation(self, observation: dict[str, Any]) -> None:
         with self._lock:
@@ -76,11 +65,15 @@ class AsyncInferenceEngine:
                 with self._lock:
                     obs = self._latest_obs
                     self._obs_updated = False
+                    if obs is None:
+                        break
+                    self._inferring = True
 
-                if obs is None:
-                    break
-
-                action_traj = self._policy.predict_action_trajectory(obs)
+                try:
+                    action_traj = self._policy.predict_action_trajectory(obs)
+                finally:
+                    with self._lock:
+                        self._inferring = False
 
                 with self._lock:
                     self._result_traj = action_traj

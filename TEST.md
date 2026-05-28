@@ -8,6 +8,29 @@ Environment variables used throughout:
 - `MUJOCO_GL=egl` — use EGL offscreen rendering (required for headless GPU render)
 - `DISPLAY=:0` — X11 display target (only needed when viewer is on)
 
+OpenGL viewer note: on machines where the NVIDIA GPU is not attached to a display, GLFW/X11 OpenGL may silently fall back to Mesa `llvmpipe` software rendering. In that case `nvidia-smi` can still show the GPU, but viewer/camera readback will be extremely slow. Check with `DISPLAY=:0 glxinfo -B`; if the renderer is `llvmpipe`, run viewer/debug commands through the `.bashrc` wrapper:
+
+```bash
+nvgpu() {
+  __NV_PRIME_RENDER_OFFLOAD=1 \
+  __GLX_VENDOR_LIBRARY_NAME=nvidia \
+  __VK_LAYER_NV_optimus=NVIDIA_only \
+  DISPLAY=${DISPLAY:-:0} \
+  "$@"
+}
+```
+
+Examples:
+
+```bash
+# If the conda env is already active
+nvgpu python scripts/mujoco_render_benchmark.py --mode viewer_fast --loops 80 --physics-steps 8
+
+# Or with conda run
+nvgpu conda run -n lerobot-mujoco-manipulation \
+  python scripts/mujoco_render_benchmark.py --mode viewer_fast --loops 80 --physics-steps 8
+```
+
 ---
 
 ## 1. Asset Validation (Milestone 1)
@@ -72,12 +95,12 @@ MUJOCO_GL=egl DISPLAY=:0 conda run -n lerobot-mujoco-manipulation \
 MUJOCO_GL=egl DISPLAY=:0 conda run -n lerobot-mujoco-manipulation \
   python scripts/mujoco_render_benchmark.py --mode renderer --loops 50 --physics-steps 8 --camera-every 1
 
-# Viewer basic render (GLFW path — may be slow on remote/headless hosts)
-DISPLAY=:0 conda run -n lerobot-mujoco-manipulation \
+# Viewer basic render (GLFW path; use nvgpu if OpenGL otherwise falls back to llvmpipe)
+nvgpu conda run -n lerobot-mujoco-manipulation \
   python scripts/mujoco_render_benchmark.py --mode viewer_fast --loops 80 --physics-steps 8
 
 # Viewer with offscreen camera (simulates model_sim.py overlay path)
-DISPLAY=:0 conda run -n lerobot-mujoco-manipulation \
+nvgpu conda run -n lerobot-mujoco-manipulation \
   python scripts/mujoco_render_benchmark.py --mode camera --loops 80 --physics-steps 8 --camera-every 1
 ```
 

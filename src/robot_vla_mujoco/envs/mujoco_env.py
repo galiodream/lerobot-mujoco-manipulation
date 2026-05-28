@@ -67,7 +67,7 @@ class MujocoManipulationEnv:
         self._success_condition = cls()
         self._success_condition.reset(self, sc_params)
 
-        self._max_steps = 400
+        self._max_steps = 800
         self._step_count = 0
         self._episode_seed = seed
 
@@ -96,7 +96,7 @@ class MujocoManipulationEnv:
     def step(self, action: np.ndarray) -> tuple[dict[str, Any], float, bool, bool, dict[str, Any]]:
         self._env.step(action)
         sim_dt = self._env.env.model.opt.timestep
-        physics_steps = max(1, round(0.15 / sim_dt))
+        physics_steps = max(1, round(0.15 / sim_dt)) # 0.15 s/step * 800 steps = 120s (sim time)
         self._env.step_env(nstep=physics_steps)
         self._step_count += 1
 

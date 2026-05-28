@@ -46,7 +46,6 @@ class SmolVLAAdapter(PolicyAdapter):
 
         self._policy = SmolVLAPolicy.from_pretrained(
             checkpoint_path,
-            config=cfg,
         )
         self._policy.to(device)
         self._policy.eval()
@@ -70,6 +69,8 @@ class SmolVLAAdapter(PolicyAdapter):
         state = observation.get("observation.state")
         if state is None:
             state = np.zeros(self._action_dim, dtype=np.float32)
+        elif state.shape[-1] > self._policy.config.input_features["observation.state"].shape[0]:
+            state = state[..., :self._policy.config.input_features["observation.state"].shape[0]]
 
         front_img = observation.get("observation.images.front")
         wrist_img = observation.get("observation.images.wrist")

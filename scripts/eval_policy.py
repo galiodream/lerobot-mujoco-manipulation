@@ -52,7 +52,7 @@ def main():
     parser.add_argument("--policy", default="dummy", choices=["dummy", "smolvla", "pi0", "pi05"])
     parser.add_argument("--checkpoint", default="", help="Policy checkpoint path")
     parser.add_argument("--episodes", type=int, default=20)
-    parser.add_argument("--max-steps", type=int, default=400)
+    parser.add_argument("--max-steps", type=int, default=800)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--output-dir", default="outputs/eval")
     parser.add_argument("--no-viewer", action="store_true")
